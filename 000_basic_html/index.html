@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      body {
+        margin: 0;
+      }
+
+      #health-bar {
+        position: fixed;
+        z-index: 2;
+        font-size: 2em;
+        color: white;
+      }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r123/three.min.js"></script>
+  </head>
+  <body>
+    <div id="health-bar">Health: 100</div>
+
+    <script>
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x010101);
+
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        2000
+      );
+
+      const renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      document.body.appendChild(renderer.domElement);
+
+      const sphereGeometry = new THREE.SphereGeometry(2, 32, 32);
+      const floorGeometry = new THREE.PlaneGeometry(1000, 1000, 10, 10);
+      const obstacleGeometry = new THREE.BoxGeometry(5, 5);
+
+      const sphereMaterial = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+      });
+
+      const floorMaterial = new THREE.MeshBasicMaterial({
+        color: 0xd3d3d3,
+        side: THREE.DoubleSide,
+      });
+      const obstacleMaterial = new THREE.MeshBasicMaterial({ color: 0x1f3fff });
+
+      const sphereMesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
+      sphereMesh.add(camera);
+
+      scene.add(sphereMesh);
+
+      const loader = new THREE.TextureLoader();
+
+      loader.load("texture.png", function (texture) {
+        sphereMesh.material.needsUpdate = true;
+
+        sphereMesh.material.map = texture;
+      });
+
+      const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+      floorMesh.rotation.x = Math.PI / 2;
+      floorMesh.position.y = -5;
+      scene.add(floorMesh);
+
+      const obstacleMesh = new THREE.Mesh(obstacleGeometry, obstacleMaterial);
+
+      scene.add(obstacleMesh);
+
+      camera.position.z = 5;
+
+      const collidableObjects = [];
+      collidableObjects.push(obstacleMesh);
+
+      const animate = function () {
+        requestAnimationFrame(animate);
+
+        renderer.render(scene, camera);
+        update();
+      };
+
+      animate();
+
+      sphereMesh.health = 100;
+
+      window.addEventListener("keydown", onKeyDown, false);
+      window.addEventListener("keyup", onKeyUp, false);
+
+      var keyboardEvent = "";
+      var pressed = false;
+
+      const moveStepIncrease = 0.1;
+
+      function update() {
+        if (pressed) {
+          if (keyboardEvent === "ArrowLeft") {
+            sphereMesh.position.x -= moveStepIncrease;
+          }
+          if (keyboardEvent === "ArrowRight") {
+            sphereMesh.position.x += moveStepIncrease;
+          }
+
+          if (keyboardEvent === " ") {
+            sphereMesh.position.y += moveStepIncrease;
+          }
+
+          if (keyboardEvent === "Escape") {
+            sphereMesh.position.y -= moveStepIncrease;
+          }
+
+          if (keyboardEvent === "ArrowUp") {
+            sphereMesh.position.z -= moveStepIncrease;
+          }
+          if (keyboardEvent === "ArrowDown") {
+            sphereMesh.position.z += moveStepIncrease;
+          }
+        }
+
+        let originPoint = sphereMesh.position.clone();
+
+        for (
+          let vertexIndex = 0;
+          vertexIndex < sphereMesh.geometry.vertices.length;
+          vertexIndex++
+        ) {
+          let localVertex = sphereMesh.geometry.vertices[vertexIndex].clone();
+
+          let globalVertex = localVertex.applyMatrix4(sphereMesh.matrix);
+
+          let directionVector = globalVertex.sub(sphereMesh.position);
+
+          let raycast = new THREE.Raycaster(
+            originPoint,
+            directionVector.clone().normalize()
+          );
+
+          let collisions = raycast.intersectObjects(collidableObjects);
+
+          if (
+            collisions.length > 0 &&
+            collisions[0].distance < directionVector.length()
+          ) {
+            console.log("Collision Detected");
+
+            sphereMesh.health--;
+            document.getElementById("health-bar").firstChild.nodeValue =
+              "Health: " + sphereMesh.health;
+
+            break;
+          }
+        }
+      }
+
+      function onKeyUp(event) {
+        pressed = false;
+        keyboardEvent = "";
+      }
+
+      function onKeyDown(event) {
+        pressed = true;
+        keyboardEvent = event.key;
+      }
+
+      window.addEventListener("resize", onWindowResize, false);
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    </script>
+  </body>
+</html>
